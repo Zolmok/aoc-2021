@@ -4,7 +4,8 @@ extern crate aoc;
 struct Bingo {
     board: Vec<Vec<i32>>,
     x: usize,
-    y: usize
+    y: usize,
+    winner: bool
 }
 
 impl Bingo {
@@ -12,12 +13,13 @@ impl Bingo {
         let mut board = Vec::with_capacity(height);
         let x = width;
         let y = height;
+        let winner = false;
 
         for _ in 0..height {
             board.push([i32::default()].repeat(width));
         }
 
-        Self { board, x, y }
+        Self { board, x, y, winner }
     }
 
     fn set(&mut self, x: usize, values: Vec<i32>) {
@@ -40,6 +42,9 @@ impl Bingo {
         let mut winner = Err(false);
         let mut matches: Vec<(usize, usize)> = vec![];
 
+        if self.winner {
+            return winner;
+        }
         if numbers.len() < 5 {
             return winner;
         }
@@ -58,6 +63,7 @@ impl Bingo {
                             let found = matches.iter().filter(|&&coord| coord.0 == x).count();
 
                             if found == self.x {
+                                self.winner = true;
                                 winner = Ok(true);
                             }
                         }
@@ -66,6 +72,7 @@ impl Bingo {
                             let found = matches.iter().filter(|&&coord| coord.1 == y).count();
 
                             if found == self.y {
+                                self.winner = true;
                                 winner = Ok(true);
                             }
                         }
@@ -139,9 +146,63 @@ fn part1(cards: &mut Vec<Bingo>, input: Vec<i32>) -> Result<i32, String> {
     Ok(score)
 }
 
-// fn part2(_cards: Vec<Bingo>, _input: Vec<usize>) -> Result<i32, String> {
-//     Err("not implemented".to_string())
-// }
+fn part2(cards: &mut Vec<Bingo>, input: Vec<i32>) -> Result<i32, String> {
+    let mut next_number: Vec<i32> = vec![];
+    let mut unmarked: Vec<i32> = vec![];
+    let mut last_called: Vec<Vec<i32>> = vec![];
+    let score: i32;
+    let sum_unmarked: i32;
+    let winners: &mut Vec<Bingo> = &mut vec![];
+
+    // call the numbers out
+    for number in 0..input.len() {
+        let mut winner = Err(false);
+
+        next_number.push(input[number]);
+
+        // check cards for winners
+        cards.iter_mut().for_each(|card| {
+            winner = card.check_win(next_number.to_vec());
+
+            if winner == Ok(true) {
+                winners.push(card.to_owned());
+                last_called.push(next_number.to_owned());
+            }
+        });
+    }
+
+    // winner found, calculate score
+    let last_winner = match winners.last() {
+        Some(value) => value,
+        None => panic!("Error getting last winner")
+    };
+    let last_called_winner: Vec<i32> = last_called[winners.len() - 1].clone();
+
+    // find all the unmarked numbers
+    for row in 0..last_winner.y {
+        for col in 0..last_winner.x {
+            let val = last_winner.get(row, col);
+
+            if last_called_winner.contains(val) == false {
+                unmarked.push(*val);                           
+            }
+        }
+    }
+
+    // sum the unmarked numbers
+    sum_unmarked = unmarked.iter().sum();
+
+    // find the last number that was called
+    let last_num_called = match last_called_winner.last() {
+        Some(val) => val,
+        None => &0
+    };
+
+    // score is the sum of all the unmarked numbers * the last number called
+    score = sum_unmarked * last_num_called;
+
+    Ok(score)
+}
 
 fn main() {
     let mut card: Bingo = Bingo::new(5, 5);
@@ -186,6 +247,17 @@ fn main() {
     }
 
     let score = match part1(cards, bingo_numbers.to_vec()) {
+        Ok(value) => value,
+        Err(error) => {
+            println!("No winner found: {}", error);
+
+            0
+        }
+    };
+
+    println!("Score: {}", score);
+
+    let score = match part2(cards, bingo_numbers.to_vec()) {
         Ok(value) => value,
         Err(error) => {
             println!("No winner found: {}", error);
